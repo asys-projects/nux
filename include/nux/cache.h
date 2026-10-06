@@ -149,6 +149,9 @@ cache_get (struct cache *c, uintptr_t addr)
 
       TAILQ_REMOVE (&c->freelist, slot, lru_entry);
       assert (slot->ref == 0);
+      /* The evicted entry is still indexed by its old address. */
+      if (slot->valid)
+	rb_tree_remove_node (&c->map, slot);
       c->fill (n, slot->addr, addr);
       slot->addr = addr;
       slot->ref = 1;

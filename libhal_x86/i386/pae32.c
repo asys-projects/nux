@@ -170,11 +170,9 @@ linmap_get_l1p (unsigned long va, bool alloc, bool user)
 
   if (!pte_present (l2e))
     {
-      printf ("Not present!");
       if (!alloc)
 	return PTEP_INVALID;
       l2e = alloc_table (user);
-      printf ("ALLOCATED %lx\n", l2e);
       if (l2e == PTE_INVALID)
 	return PTEP_INVALID;
       set_pte (l2p, l2e);
@@ -316,9 +314,15 @@ kmap_get_l1p (unsigned long va, bool alloc)
 void
 hal_umap_init (struct hal_umap *umap)
 {
+  /*
+     With PAE the CPU loads the L3 entries (PDPTEs) when CR3 is loaded,
+     and the linear mappings only mirror them: an L3 entry cannot be
+     added to a UMAP while it is loaded in a CPU.  Allocate all the
+     user L2 tables upfront, as hal_umap_bootstrap() does.
+   */
   for (int i = 0; i < UMAP_L3PTES; i++)
     {
-      umap->l3[i] = 0;
+      umap->l3[i] = alloc_l3table ();
     }
 }
 
@@ -569,11 +573,9 @@ pt_umap_free (struct hal_umap *umap)
 	      if (pte_present (l2e))
 		{
 		  l1pfn = pte_pfn (l2e);
-		  printf ("Freeing L1 %lx\n", l1pfn);
 		  pfn_free (l1pfn);
 		}
 	    }
-	  printf ("Freeing L2 %lx\n", l2pfn);
 	  pfn_free (l2pfn);
 	}
       umap->l3[i] = PTE_INVALID;
