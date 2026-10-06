@@ -42,6 +42,13 @@
 	.endif
 	.endif
 
+	/* The frame to resume may be anywhere in memory (e.g. in a
+	   kernel structure describing a user context).  Resume it from
+	   this CPU's kernel stack: with ESP pointing elsewhere, an NMI
+	   taken before the IRET would push its frame over the memory
+	   that precedes the context. */
+	pushl %eax
+	call _C_LABEL(i386_frame_resume)
 	mov %eax, %esp
 .endm
 

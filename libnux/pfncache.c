@@ -56,6 +56,10 @@ pfn_get (pfn_t pfn)
     return (void *) (hal_virtmem_dmapbase () + (pfn << PAGE_SHIFT));
 
   slot = cache_get (&cache, pfn);
+  /* All slots in use (a leaked reference, or too many concurrent
+     users): returning an address outside the cache would corrupt
+     memory. */
+  assert (slot != (uintptr_t) (unsigned) -1 && "PFN cache exhausted");
 
   /* Update tlb if we have stale entries in our PFN cache. */
   __atomic_load (&pfnc_tlbgen, &target, __ATOMIC_ACQUIRE);

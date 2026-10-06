@@ -12,9 +12,16 @@
 
 #include <stdint.h>
 
-#define L1P_INVALID ((uintptr_t)0)
-
+/* An L1 pointer is either a kernel virtual address (page tables of the
+   current address space) or, tagged by bit 0, the physical address of
+   an entry in a foreign table.  With PAE on i386 page tables can live
+   above 4GB, so the type must hold 64-bit physical addresses. */
+#ifdef __i386__
+typedef uint64_t hal_l1p_t;
+#else
 typedef uintptr_t hal_l1p_t;
+#endif
+#define L1P_INVALID ((hal_l1p_t)0)
 typedef uint64_t hal_l1e_t;
 
 static inline void

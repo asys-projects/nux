@@ -108,6 +108,30 @@ do_syscall (struct hal_frame *f)
   return rf;
 }
 
+/*
+ * Return the location from which to resume frame RF.  User frames not
+ * already at the top of this CPU's kernel stack are copied there (see
+ * entry.S).  Kernel frames are always the entry frame, on the stack.
+ */
+struct hal_frame *
+i386_frame_resume (struct hal_frame *rf)
+{
+  extern vaddr_t pcpu_haldata[];
+  struct hal_frame *top;
+  struct hal_cpu *hc;
+  uint16_t tr;
+
+  if (rf->cs != UCS)
+    return rf;
+  /* TSS selector of CPU n is (5 + 4 * n) << 3 (see hal_pcpu_enter). */
+  asm volatile ("str %0":"=r" (tr));
+  hc = (struct hal_cpu *) (uintptr_t) pcpu_haldata[((tr >> 3) - 5) / 4];
+  top = (struct hal_frame *) (uintptr_t) (hc->tss.esp0 - sizeof (*top));
+  if (top != rf)
+    memcpy (top, rf, sizeof (*top));
+  return top;
+}
+
 struct hal_frame *
 do_vect (uint32_t vect, struct hal_frame *f)
 {

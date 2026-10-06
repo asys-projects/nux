@@ -66,7 +66,7 @@ int inb (int port);
 void outb (int port, int val);
 
 typedef uint64_t pte_t;
-typedef uintptr_t ptep_t;
+typedef hal_l1p_t ptep_t;
 
 pte_t get_pte (ptep_t ptep);
 pte_t set_pte (ptep_t ptep, pte_t pte);

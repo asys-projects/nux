@@ -36,7 +36,7 @@
 #define PTE_INVALID ((uint64_t)0)
 #define PTEP_INVALID L1P_INVALID
 #define mkptep_cur(_p) ((ptep_t)(uintptr_t)(_p))
-#define mkptep_fgn(_p) ((ptep_t)(uintptr_t)(_p) | 1)
+#define mkptep_fgn(_p) ((ptep_t)(_p) | 1)
 #define ptep_is_foreign(_p) ((_p) & 1)
 
 extern int _linear_start;
@@ -98,8 +98,8 @@ set_pte (ptep_t ptep, pte_t pte)
     }
   else
     {
-      old = *(pte_t *) ptep;
-      *(pte_t *) ptep = pte;
+      old = *(pte_t *) (uintptr_t) ptep;
+      *(pte_t *) (uintptr_t) ptep = pte;
     }
 
   return old;
@@ -242,7 +242,7 @@ get_umap_l2p (struct hal_umap *umap, unsigned long va, bool alloc)
       return PTEP_INVALID;
     }
 
-  return mkptep_fgn ((l2pfn << PAGE_SHIFT) + (L2OFF (va) << 3));
+  return mkptep_fgn (((ptep_t) l2pfn << PAGE_SHIFT) + (L2OFF (va) << 3));
 }
 
 static pfn_t
@@ -289,7 +289,7 @@ umap_get_l1p (struct hal_umap *umap, unsigned long va, bool alloc)
     {
       return PTEP_INVALID;
     }
-  return mkptep_fgn ((l1pfn << PAGE_SHIFT) + (L1OFF (va) << 3));
+  return mkptep_fgn (((ptep_t) l1pfn << PAGE_SHIFT) + (L1OFF (va) << 3));
 }
 
 unsigned long
@@ -449,7 +449,7 @@ scan_l1 (pfn_t l1pfn, unsigned off, unsigned *l1off_out, hal_l1p_t * l1p_out,
       if (l1e != 0)
 	{
 	  if (l1p_out != NULL)
-	    *l1p_out = mkptep_fgn ((l1pfn << PAGE_SHIFT) + (i << 3));
+	    *l1p_out = mkptep_fgn (((ptep_t) l1pfn << PAGE_SHIFT) + (i << 3));
 	  if (l1e_out != NULL)
 	    *l1e_out = l1e;
 	  *l1off_out = i;
@@ -576,6 +576,10 @@ pt_umap_free (struct hal_umap *umap)
 		  pfn_free (l1pfn);
 		}
 	    }
+	  /* Release the PFN cache slot before freeing the page: a slot
+	     leaked here per L2 table exhausts the cache after a few
+	     dozen address spaces have been destroyed. */
+	  pfn_put (l2pfn, l2ptr);
 	  pfn_free (l2pfn);
 	}
       umap->l3[i] = PTE_INVALID;
@@ -609,9 +613,15 @@ pae32_init_ap (void)
     va[linoff + i] = mkpte (l2pfn[i], PTE_P | PTE_W | PTE_U);
   kva_unmap (va, PAGE_SIZE);
 
-  /* Note: we allocate a full page for only 256 bytes. Could be optimized. */
-  l3pfn = pfn_alloc (0);
+  /* Note: we allocate a full page for only 256 bytes. Could be optimized.
+
+     In PAE mode CR3 is a 32-bit register: the page-directory-pointer
+     table must lie below 4GB.  pfn_alloc (0) returns the highest free
+     page, which is above 4GB on machines with that much memory; ask
+     for the lowest one instead. */
+  l3pfn = pfn_alloc (1);
   assert (l3pfn != PFN_INVALID);
+  assert (ptob (l3pfn) < (1ULL << 32));
 
   va = kva_physmap (ptob (l3pfn), PAGE_SIZE, HAL_PTE_W | HAL_PTE_P);
   for (int i = 0; i < 4; i++)
