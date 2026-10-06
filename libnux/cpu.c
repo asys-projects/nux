@@ -406,7 +406,8 @@ void
 cpu_nmiop (void)
 {
   struct cpu_info *ci = cpu_curinfo ();
-  unsigned nmiop = ci->nmiop;
+  /* Consume the requested operations. */
+  unsigned nmiop = __atomic_exchange_n (&ci->nmiop, 0, __ATOMIC_ACQ_REL);
 
   if (nmiop & NMIOP_KMAPUPDATE)
     {
@@ -414,7 +415,9 @@ cpu_nmiop (void)
     }
   if (nmiop & NMIOP_TLBFLUSH)
     {
+      __atomic_add_fetch (&ci->tlbflush_gen, 1, __ATOMIC_ACQ_REL);
       cpu_tlbflush_local ();
+      __atomic_add_fetch (&ci->tlbflush_gen, 1, __ATOMIC_ACQ_REL);
     }
 
   atomic_cpumask_clear (&tlbmap, cpu_id ());
@@ -425,7 +428,7 @@ void
 cpu_kmapupdate (int cpu)
 {
   struct cpu_info *ci = cpu_getinfo (cpu);
-  if (ci != NULL)
+  if (ci == NULL)
     return;
 
   __atomic_or_fetch (&ci->nmiop, NMIOP_KMAPUPDATE, __ATOMIC_RELAXED);
@@ -468,6 +471,65 @@ void
 cpu_tlbflush_mask (cpumask_t mask)
 {
   foreach_cpumask (mask, cpu_tlbflush (i));
+}
+
+/*
+  Flush the TLBs of all CPUs, and wait until every remote CPU has
+  completed a flush started after this call.
+
+  NUXST: any
+*/
+void
+cpu_tlbflush_broadcast_sync (void)
+{
+  cpumask_t mask;
+  unsigned long target[HAL_MAXCPUS];
+  unsigned self;
+  int i;
+
+  if (!nux_status_okcpu ())
+    {
+      hal_cpu_tlbop (HAL_TLBOP_FLUSHALL);
+      return;
+    }
+
+  self = cpu_id ();
+  mask = cpu_activemask () & ~((cpumask_t) 1 << self);
+  for (i = 0; i < HAL_MAXCPUS; i++)
+    {
+      struct cpu_info *ci;
+      unsigned long snap;
+
+      if (!(mask & ((cpumask_t) 1 << i)))
+	continue;
+      ci = cpu_getinfo (i);
+      if (ci == NULL)
+	{
+	  mask &= ~((cpumask_t) 1 << i);
+	  continue;
+	}
+      /*
+         A flush that started after this point is needed: if one is in
+         progress (odd generation), wait for the one after it.
+       */
+      snap = __atomic_load_n (&ci->tlbflush_gen, __ATOMIC_ACQUIRE);
+      target[i] = (snap & 1) ? snap + 3 : snap + 2;
+      cpu_tlbflush (i);
+    }
+
+  cpu_tlbflush_local ();
+
+  for (i = 0; i < HAL_MAXCPUS; i++)
+    {
+      struct cpu_info *ci;
+
+      if (!(mask & ((cpumask_t) 1 << i)))
+	continue;
+      ci = cpu_getinfo (i);
+      while ((long) (__atomic_load_n (&ci->tlbflush_gen, __ATOMIC_ACQUIRE)
+		     - target[i]) < 0)
+	hal_cpu_relax ();
+    }
 }
 
 /* NUXST: any */

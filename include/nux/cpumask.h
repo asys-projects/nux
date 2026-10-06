@@ -41,13 +41,13 @@ atomic_cpumask (cpumask_t * cpumask)
 static inline void
 cpumask_set (cpumask_t * cpumask, unsigned cpu)
 {
-  *cpumask |= (1 << cpu);
+  *cpumask |= ((cpumask_t) 1 << cpu);
 }
 
 static inline void
 cpumask_clear (cpumask_t * cpumask, unsigned cpu)
 {
-  *cpumask &= ~(1 << cpu);
+  *cpumask &= ~((cpumask_t) 1 << cpu);
 }
 
 /*

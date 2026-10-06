@@ -73,6 +73,7 @@ stree_pfnfree (pfn_t pfn)
   assert (pfn < hal_physmem_maxpfn ());
   spinlock (&pglock);
   stree_setbit (stree, order, pfn);
+  free_pages++;
   spinunlock (&pglock);
 }
 
@@ -106,7 +107,6 @@ pfn_free (pfn_t pfn)
 {
   readlock (&_nux_pfnalloc_lock);
   _nux_pfnfree (pfn);
-  free_pages++;
   readunlock (&_nux_pfnalloc_lock);
 }
 

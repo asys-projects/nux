@@ -79,6 +79,13 @@ struct cpu_info
   volatile struct ktlb ktlb;
 
   /*
+     User TLB flush generation: incremented when an NMI-requested TLB
+     flush starts (odd) and when it completes (even). Used by
+     cpu_tlbflush_broadcast_sync() to wait for remote completion.
+   */
+  volatile unsigned long tlbflush_gen;
+
+  /*
      User copy setjmp/longjmp for pagefaults.
    */
   jmp_buf usrpgfaultctx;
