@@ -377,6 +377,13 @@ plt_irq_max (void)
   return 0;
 }
 
+bool
+plt_msi_alloc (unsigned *irq, uint64_t * addr, uint32_t * data)
+{
+  /* TODO: the IMSIC (AIA). */
+  return false;
+}
+
 void
 plt_eoi_ipi (void)
 {

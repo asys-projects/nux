@@ -89,6 +89,12 @@ lapic_getcurrent (void)
   return (unsigned) (lapic_read (L_IDREG) >> 24);
 }
 
+unsigned
+lapic_current (void)
+{
+  return lapic_getcurrent ();
+}
+
 static void
 lapic_configure (void)
 {

@@ -274,6 +274,10 @@ plt_irq_enable (unsigned gsi)
 {
   uint32_t lo;
 
+  /* IRQs above the GSIs have no IOAPIC pin (MSIs). */
+  if (gsi >= gsis_no)
+    return;
+
   lo = ioapic_read (gsis[gsi].ioapic, IO_RED_LO (gsis[gsi].pin));
   lo &= ~0x10000L;		/* UNMASK */
   ioapic_write (gsis[gsi].ioapic, IO_RED_LO (gsis[gsi].pin), lo);;
@@ -284,6 +288,9 @@ plt_irq_disable (unsigned gsi)
 {
   uint32_t lo;
 
+  if (gsi >= gsis_no)
+    return;
+
   lo = ioapic_read (gsis[gsi].ioapic, IO_RED_LO (gsis[gsi].pin));
   lo |= 0x10000L;		/* MASK */
   ioapic_write (gsis[gsi].ioapic, IO_RED_LO (gsis[gsi].pin), lo);;
@@ -293,4 +300,35 @@ unsigned
 plt_irq_max (void)
 {
   return APIC_VECT_IRQMAX;
+}
+
+/*
+  MSIs use the IRQs (and so the vectors) above the GSIs.  The message
+  is a write to the local APIC area: fixed delivery to the current
+  CPU's APIC, edge triggered, at the IRQ's vector.
+*/
+static lock_t msi_lock;
+static unsigned msi_next;
+
+bool
+plt_msi_alloc (unsigned *irq, uint64_t * addr, uint32_t * data)
+{
+  unsigned i;
+
+  spinlock (&msi_lock);
+  if (msi_next < gsis_no)
+    msi_next = gsis_no;
+  while (msi_next < APIC_VECT_IRQMAX && msi_next == pltacpi_hpet_irq)
+    msi_next++;
+  if (msi_next >= APIC_VECT_IRQMAX)
+    {
+      spinunlock (&msi_lock);
+      return false;
+    }
+  i = msi_next++;
+  spinunlock (&msi_lock);
+  *irq = i;
+  *addr = 0xfee00000ULL | ((uint64_t) lapic_current () << 12);
+  *data = APIC_VECT_IRQBASE + i;
+  return true;
 }

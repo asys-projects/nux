@@ -47,6 +47,18 @@ void plt_irq_disable (unsigned irq);
 */
 unsigned plt_irq_max (void);
 
+/*
+  Message-signalled interrupts (PCI MSI and MSI-X).
+
+  Allocate an IRQ not wired to an interrupt controller input, and get
+  the message (address and data) a device writes to raise it.  The
+  IRQ is edge triggered and is delivered like the others (masking is
+  the device's business: plt_irq_enable() and plt_irq_disable() do
+  nothing on it).  Returns false when the platform has no MSI support
+  or no IRQ left.
+*/
+bool plt_msi_alloc (unsigned *irq, uint64_t * addr, uint32_t * data);
+
 static inline bool
 plt_irq_islevel (unsigned irq)
 {

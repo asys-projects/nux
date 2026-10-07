@@ -17,6 +17,7 @@ void lapic_init (uint64_t, unsigned);
 void lapic_add (uint16_t, uint16_t);
 void lapic_add_nmi (uint8_t, int);
 void lapic_eoi (void);
+unsigned lapic_current (void);
 
 void ioapic_init (unsigned no);
 void ioapic_add (unsigned num, uint64_t base, unsigned irqbase);
