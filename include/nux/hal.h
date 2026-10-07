@@ -69,6 +69,43 @@ void *hal_cpu_getdata (void);
 
 
 /*
+  HAL FPU: the floating point (and vector) registers of user programs.
+
+  They are not part of the HAL frame: the kernel decides when to save
+  and restore them, so that it can switch them lazily.  When the FPU
+  is disabled, the first FPU instruction of a user program raises the
+  HAL_XCPT_FPU exception (hal_entry_xcpt): the kernel then saves the
+  registers of their previous owner, loads the program's own and
+  enables the FPU.  The kernel itself does not use the FPU.
+
+  struct hal_fpu (hal_config.h) holds the registers.  Implemented by
+  the x86 HALs (i386 and amd64).
+*/
+struct hal_fpu;
+
+/*
+  Initialise the current CPU's FPU, save its initial (clean) state in
+  INITIAL and leave the FPU disabled.  Called once on every CPU.
+*/
+void hal_fpu_init (struct hal_fpu *initial);
+
+/*
+  Enable or disable the FPU of the current CPU, or check whether it is
+  enabled.
+*/
+void hal_fpu_enable (void);
+void hal_fpu_disable (void);
+bool hal_fpu_enabled (void);
+
+/*
+  Save the FPU registers in FPU, or load them from it.  The FPU must
+  be enabled.
+*/
+void hal_fpu_save (struct hal_fpu *fpu);
+void hal_fpu_restore (const struct hal_fpu *fpu);
+
+
+/*
   Allow reading from user mapped memory.
  */
 void hal_useraccess_start (void);

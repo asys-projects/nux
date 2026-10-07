@@ -256,6 +256,104 @@ hal_cpu_out (uint8_t size, uint32_t port, unsigned long val)
     }
 }
 
+/*
+  FPU (see hal.h).  CR0.TS disables it: the next FPU instruction
+  raises #NM.  With FXSR (CR4.OSFXSR) FXSAVE/FXRSTOR handle the SSE
+  state too (and CR4.OSXMMEXCPT reports SIMD exceptions as #XM).
+*/
+#define CR0_MP 0x2
+#define CR0_EM 0x4
+#define CR0_TS 0x8
+#define CR0_NE 0x20
+#define CR4_OSFXSR 0x200
+#define CR4_OSXMMEXCPT 0x400
+#define CPUID1_EDX_FXSR (1 << 24)
+#define CPUID1_EDX_SSE (1 << 25)
+
+static bool fpu_fxsr;
+
+static inline unsigned long
+read_cr0 (void)
+{
+  unsigned long r;
+  asm volatile ("mov %%cr0, %0":"=r" (r));
+  return r;
+}
+
+static inline void
+write_cr0 (unsigned long r)
+{
+  asm volatile ("mov %0, %%cr0"::"r" (r));
+}
+
+void
+hal_fpu_init (struct hal_fpu *initial)
+{
+  uint32_t a, b, c, d;
+  unsigned long cr0;
+
+  asm volatile ("cpuid":"=a" (a), "=b" (b), "=c" (c), "=d" (d):"a" (1));
+  fpu_fxsr = !!(d & CPUID1_EDX_FXSR);
+  if (fpu_fxsr)
+    {
+      unsigned long cr4 = read_cr4 ();
+      cr4 |= CR4_OSFXSR;
+      if (d & CPUID1_EDX_SSE)
+	cr4 |= CR4_OSXMMEXCPT;
+      write_cr4 (cr4);
+    }
+  cr0 = read_cr0 ();
+  cr0 &= ~(CR0_EM | CR0_TS);
+  cr0 |= CR0_MP | CR0_NE;
+  write_cr0 (cr0);
+  asm volatile ("fninit");
+  hal_fpu_save (initial);
+  hal_fpu_disable ();
+}
+
+void
+hal_fpu_enable (void)
+{
+  asm volatile ("clts");
+}
+
+void
+hal_fpu_disable (void)
+{
+  write_cr0 (read_cr0 () | CR0_TS);
+}
+
+bool
+hal_fpu_enabled (void)
+{
+  return !(read_cr0 () & CR0_TS);
+}
+
+void
+hal_fpu_save (struct hal_fpu *fpu)
+{
+  if (fpu_fxsr)
+    asm volatile ("fxsave (%0)"::"r" (fpu->area):"memory");
+  else
+    asm volatile ("fnsave (%0); fwait"::"r" (fpu->area):"memory");
+}
+
+void
+hal_fpu_restore (const struct hal_fpu *fpu)
+{
+  if (fpu_fxsr)
+    asm volatile ("fxrstor (%0)"::"r" (fpu->area):"memory");
+  else
+    asm volatile ("frstor (%0)"::"r" (fpu->area):"memory");
+}
+
+void
+hal_x86_inl_regs (struct hal_x86_ioregs *r)
+{
+  asm volatile ("inl %%dx, %%eax":"+a" (r->eax), "+b" (r->ebx),
+		"+c" (r->ecx), "+d" (r->edx));
+}
+
 void
 hal_cpu_relax (void)
 {

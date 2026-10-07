@@ -125,6 +125,18 @@ void plt_tmr_setalm (uint64_t alm);
 void plt_tmr_clralm (void);
 
 /*
+  PLT Power.
+
+  Turn the machine off, or reset it, with the means the platform
+  describes (ACPI: the FADT's PM1 control blocks and reset register;
+  SBI: the system reset extension).  These return only if the
+  platform failed to act: the caller decides what to do then (e.g.,
+  halt the CPU).
+*/
+void plt_poweroff (void);
+void plt_reset (void);
+
+/*
  * PLT End of Interrupts.
  */
 void plt_eoi_timer (void);

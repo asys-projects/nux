@@ -6,6 +6,7 @@
 */
 
 
+#include <stddef.h>
 #include <string.h>
 #include <nux/defs.h>
 #include <nux/types.h>
@@ -19,6 +20,7 @@
 static paddr_t pa_root_table;
 static paddr_t pa_apic_table;
 static paddr_t pa_hpet_table;
+static paddr_t pa_fadt_table;
 
 static void *
 load_table (paddr_t pa)
@@ -118,6 +120,8 @@ acpi_init (paddr_t root)
 	pa_apic_table = pasdt;
       else if (!memcmp (sdtable->signature, "HPET", 4))
 	pa_hpet_table = pasdt;
+      else if (!memcmp (sdtable->signature, "FACP", 4))
+	pa_fadt_table = pasdt;
 
       unload_table (sdtable);
       length -= entrylen;
@@ -129,6 +133,7 @@ acpi_init (paddr_t root)
   debug ("RDST table at pa %" PRIx64, pa_root_table);
   debug ("APIC table at pa %" PRIx64, pa_apic_table);
   debug ("HPET table at pa %" PRIx64, pa_hpet_table);
+  debug ("FADT table at pa %" PRIx64, pa_fadt_table);
 }
 
 void
@@ -331,4 +336,63 @@ acpi_hpet_scan (void)
 
 
   return rc;
+}
+
+/*
+  Power management registers: the PM1 control blocks (FADT) and the
+  sleep type of S5, soft-off, from the DSDT's \_S5 package.  NUX has no
+  AML interpreter: the package is found by its encoding (NameOp _S5_
+  PackageOp PkgLength NumElements SLP_TYPa SLP_TYPb).
+*/
+
+static void
+acpi_dsdt_s5 (paddr_t pa)
+{
+  struct acpi_thdr *dsdt;
+  uint8_t *t;
+
+  if (pa == 0 || (dsdt = load_table (pa)) == NULL)
+    return;
+  t = (uint8_t *) dsdt;
+  for (uint32_t i = sizeof (*dsdt); i + 12 < dsdt->length && i + 12 < ACPI_MAX_TBL; i++)
+    {
+      uint8_t *p;
+      uint16_t typa, typb;
+
+      if (memcmp (t + i, "_S5_", 4) != 0)
+	continue;
+      if (t[i - 1] != 0x08 && !(t[i - 2] == 0x08 && t[i - 1] == '\\'))
+	continue;
+      p = t + i + 4;
+      if (*p != 0x12)
+	continue;
+      p++;
+      p += ((*p & 0xc0) >> 6) + 1;	/* PkgLength. */
+      p++;			/* NumElements. */
+      if (*p == 0x0a)
+	p++;			/* BytePrefix. */
+      typa = *p++;
+      if (*p == 0x0a)
+	p++;
+      typb = *p;
+      acpi_power_s5 (typa, typb);
+      break;
+    }
+  unload_table (dsdt);
+}
+
+void
+acpi_fadt_scan (void)
+{
+  struct acpi_fadt *fadt;
+
+  if (pa_fadt_table == 0 || (fadt = load_table (pa_fadt_table)) == NULL)
+    return;
+  acpi_power_pm1 (fadt->pm1a_cnt_blk, fadt->pm1b_cnt_blk);
+  if (fadt->hdr.length >= offsetof (struct acpi_fadt, reset_value) + 1
+      && (fadt->flags & ACPI_FADT_RESET_REG_SUP))
+    acpi_power_resetreg (fadt->reset_reg.spaceid, fadt->reset_reg.address,
+			 fadt->reset_value);
+  acpi_dsdt_s5 (fadt->dsdt);
+  unload_table (fadt);
 }

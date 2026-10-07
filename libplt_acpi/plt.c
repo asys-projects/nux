@@ -34,6 +34,9 @@ plt_init (void)
   gsi_start ();
 
   acpi_hpet_scan ();
+
+  acpi_fadt_scan ();
+  acpi_power_info ();
 }
 
 void

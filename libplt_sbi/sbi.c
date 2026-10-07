@@ -384,6 +384,40 @@ plt_msi_alloc (unsigned *irq, uint64_t * addr, uint32_t * data)
   return false;
 }
 
+/*
+  SBI System Reset extension (SRST): reset type 0 is shutdown, 1 cold
+  reboot.  Without it, the legacy SBI shutdown call.
+*/
+#define SBI_EXT_SRST 0x53525354
+#define SBI_SRST_SHUTDOWN 0
+#define SBI_SRST_COLD_REBOOT 1
+#define SBI_EXT_LEGACY_SHUTDOWN 0x08
+
+static void
+sbi_system_reset (unsigned long type)
+{
+  register unsigned long a0 asm ("a0") = type;
+  register unsigned long a1 asm ("a1") = 0;	/* No reason. */
+  register unsigned long a6 asm ("a6") = 0;	/* FID 0: system reset. */
+  register unsigned long a7 asm ("a7") = SBI_EXT_SRST;
+
+  asm volatile ("ecall":"+r" (a0), "+r" (a1):"r" (a6), "r" (a7):"memory");
+}
+
+void
+plt_poweroff (void)
+{
+  sbi_system_reset (SBI_SRST_SHUTDOWN);
+  asm volatile ("li a7, %0\n" "ecall\n"::"i" (SBI_EXT_LEGACY_SHUTDOWN):"a0",
+		"a7");
+}
+
+void
+plt_reset (void)
+{
+  sbi_system_reset (SBI_SRST_COLD_REBOOT);
+}
+
 void
 plt_eoi_ipi (void)
 {

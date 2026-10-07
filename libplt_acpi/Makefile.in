@@ -11,4 +11,4 @@
 LIBDIR=lib
 LIBRARY=plt
 
-SRCS+= plt.c lapic.c ioapic.c hpet.c hw.c acpi.c
+SRCS+= plt.c lapic.c ioapic.c hpet.c hw.c acpi.c power.c

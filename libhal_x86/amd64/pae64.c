@@ -402,7 +402,7 @@ pt_umap_maxaddr (void)
 
 /* Note: this does not check for va being user. */
 hal_l1p_t
-kmap_get_l1p (unsigned long va, int alloc)
+kmap_get_l1p (unsigned long va, bool alloc)
 {
   return (hal_l1p_t) linmap_get_l1p (va, alloc, false /* !user */ );
 }

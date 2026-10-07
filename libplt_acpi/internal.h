@@ -29,6 +29,12 @@ void gsi_start (void);
 
 void acpi_init (paddr_t rdsp);
 void acpi_madt_scan (void);
+void acpi_fadt_scan (void);
+
+void acpi_power_pm1 (uint32_t pm1a, uint32_t pm1b);
+void acpi_power_s5 (uint16_t typa, uint16_t typb);
+void acpi_power_resetreg (uint8_t space, uint64_t addr, uint8_t value);
+void acpi_power_info (void);
 
 void hw_cmos_write (uint8_t addr, uint8_t val);
 void hw_delay (void);
