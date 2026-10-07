@@ -298,17 +298,6 @@ apsetup:
 	lidt _idtr
 	ljmp $KCS, $1f
 1:
-	/* Signal NUX we're booting. */
-	mov $_nux_apbooting, %edi
-	mov (%edi), %eax
-1:
-	mov %eax, %ebx
-	inc %ebx
-	lock cmpxchg %ebx, (%edi)
-	jz 1f
-	pause
-	jmp 1b
-1:
 	/* Allocate and setup stack. */
 	mov $pcpu_kstack, %esi
 	mov $pcpu_kstackcnt, %edi

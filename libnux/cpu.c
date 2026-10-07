@@ -190,6 +190,10 @@ cpu_startall (void)
       start = hal_pcpu_startaddr (pcpu);
       if (start != PADDR_INVALID)
 	{
+	  /* Account for the AP before starting it: the BSP waits for
+	     _nux_apbooting to drop to zero before removing the boot
+	     mappings the AP's trampoline runs on. */
+	  __atomic_add_fetch (&_nux_apbooting, 1, __ATOMIC_ACQ_REL);
 	  plt_pcpu_start (pcpu, start);
 	}
       else

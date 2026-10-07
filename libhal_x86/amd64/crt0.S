@@ -224,17 +224,6 @@ apsetup:
 	mov $KDS, %ax
 	mov %ax, %ss
 1:
-	/* Signal NUX we're booting. */
-	movabs $_nux_apbooting, %rdi
-	movl (%rdi), %eax
-1:
-	mov %eax, %ebx
-	inc %ebx
-	lock cmpxchgl %ebx, (%rdi)
-	jz 1f
-	pause
-	jmp 1b
-1:
 	/* Allocate and setup stack. */
 	movabs $pcpu_kstack, %rsi
 	movabs $pcpu_kstackcnt, %rdi

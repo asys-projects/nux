@@ -150,4 +150,7 @@ struct hal_frame *uctxt_frame_pointer (uctxt_t * uctxt);
 #define NUXPERF_DECLARE
 #include "perf.h"
 
+/* APs started and not yet running (init.c). */
+extern volatile uint32_t _nux_apbooting;
+
 #endif
